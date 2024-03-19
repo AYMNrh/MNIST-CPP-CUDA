@@ -1,22 +1,27 @@
 #ifndef NEURON_H
 #define NEURON_H
 
-constexpr int NUM_CONV_FILTERS = 32;
+#include <vector>
 
-struct Neuron {
-    double weights[NUM_CONV_FILTERS];
-    double bias;
-    
-    Neuron() {
-        // Initialize weights and bias
-        for (int i = 0; i < NUM_CONV_FILTERS; ++i) {
-            weights[i] = 0.0; // Initialize weights randomly or with zeros
-        }
-        bias = 0.0; // Initialize bias
-    }
+using namespace std;
+
+class Neuron {
+private:
+    vector<double> weights;    // Weights of the neuron
+    int num_inputs;                  // Number of inputs to the neuron
+    double delta;                    // Delta value for backpropagation
+    double derivative;               // Derivative of the neuron's output
+    vector<double> inputs;     // Inputs to the neuron
+
+public:
+    Neuron();                        // Default constructor
+    Neuron(int num_inputs);          // Constructor with number of inputs specified
+
+private:
+    void randomize_weights();        // Function to randomize weights
+
+public:
+    double compute_output(vector<double>& inputs);  // Function to compute the output of the neuron given inputs
 };
 
-void initialize_neuron(Neuron& neuron);
-double neuron_forward(const double input[], const Neuron& neuron);
-
-#endif /* NEURON_H */
+#endif
