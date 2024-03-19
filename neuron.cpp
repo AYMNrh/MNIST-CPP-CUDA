@@ -1,4 +1,4 @@
-#include "neuron.h"
+#include "neuron.h" // Include the header file for the Neuron class
 #include <iostream>
 #include <vector>
 #include <cmath>
