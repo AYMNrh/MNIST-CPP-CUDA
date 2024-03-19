@@ -8,11 +8,9 @@
 using namespace std;
 
 class Neuron {
-private:
+public:
     vector<double> weights;    // Weights of the neuron
     int num_inputs;            // Number of inputs to the neuron
-    double delta;              // Delta value for backpropagation
-    double derivative;         // Derivative of the neuron's output
     vector<double> inputs;     // Inputs to the neuron
 
 public:
@@ -31,20 +29,16 @@ private:
     void randomize_weights() {
         srand(time(0));                    // Seed the random number generator
         for (int i = 0; i <= num_inputs; i++)
-            // Randomize each weight
+            // Randomize each weight between [-1,1]
             weights[i] = ((double)rand() / RAND_MAX - 0.5) * 2.0;
     }
 
 public:
     // Function to compute the output of the neuron given inputs
     double compute_output(vector<double>& inputs) {
-        double fi = weights[0];               // Initialize with the bias weight
+        double output = weights[0];               // Initialize with the bias weight
         for (int i = 1; i <= num_inputs; i++)
-            fi += weights[i] * inputs[i - 1]; // Weighted sum of inputs and weights
-
-        // Use the Rectified Linear Unit (ReLU) activation function
-        double output = (fi > 0.0) ? 1.0 : 0.0;
-        derivative = output * (1 - output);   // Compute the derivative of the output
+            output += weights[i] * inputs[i - 1]; // Weighted sum of inputs and weights
         this->inputs = inputs;                // Store the inputs for later use
         return output;                        // Return the computed output
     }

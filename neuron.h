@@ -6,11 +6,9 @@
 using namespace std;
 
 class Neuron {
-private:
+public:
     vector<double> weights;    // Weights of the neuron
     int num_inputs;                  // Number of inputs to the neuron
-    double delta;                    // Delta value for backpropagation
-    double derivative;               // Derivative of the neuron's output
     vector<double> inputs;     // Inputs to the neuron
 
 public:

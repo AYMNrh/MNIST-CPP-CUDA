@@ -13,7 +13,7 @@ public:
     int stride; // Stride of the convolution operation
 
     // Constructor
-    ConvolutionalLayer(int num_filters, int filter_size, int stride, int padding);
+    ConvolutionalLayer(int num_filters, int filter_size, int stride);
 
     // Function to apply convolution operation
     vector<vector<double>> apply_convolution(const vector<vector<double>>& input);
