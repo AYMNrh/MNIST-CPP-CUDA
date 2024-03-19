@@ -1,17 +1,21 @@
 ### Setting up
 
-# All the imports!
-import tensorflow as tf # tested with 1.14.0
-import numpy as np # tested with 1.16.4
-import matplotlib.pyplot as plt #tested with 3.0.3
-from sklearn.metrics import classification_report # tested with 0.21.2l
+# All the imports
+import tensorflow as tf
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.metrics import classification_report
+import time
+
+# Record start time
+start_time = time.time()
 
 # Supress deprecation warnings
 import logging
 logging.getLogger('tensorflow').disabled = True
 
 # Fetch "Fashion MNIST" data
-(x_train, y_train), (x_test, y_test) = tf.keras.datasets.fashion_mnist.load_data()
+(x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
 
 # A good rule of thumb is to normalise input values - i.e. transform them to a
 # scale of 0 to 1. Each element in this dataset is a pixel value of 0 to 255, so
@@ -20,48 +24,14 @@ x_train = x_train / 255.0
 x_test = x_test / 255.0
 
 # Map for human readable class names
-class_names = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat',
-               'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
+class_names = ['0', '1', '2', '3', '4',
+               '5', '6', '7', '8', '9']
 
 
 print("Shape of Training Image Data: " + str(x_train.shape))
 print("Shape of Training Class Data: " + str(y_train.shape))
 print("Shape of Test Image Data: " + str(x_test.shape))
 print("Shape of Test Class Data: " + str(y_test.shape))
-
-### Visualise first 25 images from training data
-
-
-plt.figure(figsize=(15,15))
-for i in range(25):
-    plt.subplot(5,5,i+1)
-    plt.xticks([])
-    plt.yticks([])
-    plt.imshow(x_train[i], cmap=plt.cm.binary)
-    plt.xlabel(class_names[y_train[i]])
-plt.show()
-
-### Visualise image with pixel values
-
-
-# Lets view the first image and classname in the dataset
-# Tip: Change "index" value to view different images.
-index = 0
-plt.figure(figsize=(20,16))
-plt.imshow(x_train[index], cmap=plt.cm.binary)
-plt.xlabel(class_names[y_train[index]])
-plt.colorbar()
-#plt.grid(True)
-#plt.rc('grid', linestyle="-", color='fuchsia')
-
-ax = plt.gca()
-ax.set_xticks(np.arange(-.5, 28, 1))
-ax.set_yticks(np.arange(-.5, 28, 1))
-ax.set_xticklabels(np.arange(0, 29, 1))
-ax.set_yticklabels(np.arange(0, 29, 1))
-ax.xaxis.tick_top()
-
-plt.show()
 
 ### Create and build Convolutional Neural Network
 
@@ -93,28 +63,10 @@ model.add(
     )
 )
 
-# We'll now add a dropout layer. This fights overfitting and forces the model to
-# learn multiple representations of the same data by randomly disabling neurons
-# in the learning phase.
-model.add(
-    tf.keras.layers.Dropout(
-        rate=0.25 # Randomly disable 25% of neurons
-    )
-)
-
 # Output from previous layer is a 3D tensor. This must be flattened to a 1D
-# vector before beiung fed to the Dense Layers.
+# vector before being fed to the Dense Layers.
 model.add(
     tf.keras.layers.Flatten()
-)
-
-# A dense (interconnected) layer is added for mapping the derived features
-# to the required class.
-model.add(
-    tf.keras.layers.Dense(
-        units=128, # Output shape
-        activation='relu' # Rectified Linear Unit Activation Function
-    )
 )
 
 # Final layer with 10 outputs and a softmax activation. Softmax activation
@@ -217,3 +169,10 @@ for i in range(32):
     plt.xticks([])
     plt.yticks([])
     plt.imshow(feature_maps[0, :, :, i-1], cmap=plt.cm.binary)
+
+# Record end time
+end_time = time.time()
+
+# Calculate and print the elapsed time
+elapsed_time = end_time - start_time
+print("Elapsed time : {:.2f} seconds".format(elapsed_time))
