@@ -1,31 +1,26 @@
 #ifndef CONV_LAYER_H
 #define CONV_LAYER_H
 
-constexpr int IMAGE_SIZE = 28;
-constexpr int CONV_FILTER_SIZE = 3;
-constexpr int POOL_SIZE = 2;
+#include <vector>
 
-#include "neuron.h"
+using namespace std;
 
-struct ConvOutput {
-    double output[NUM_CONV_FILTERS][(IMAGE_SIZE - CONV_FILTER_SIZE + 1) / POOL_SIZE][(IMAGE_SIZE - CONV_FILTER_SIZE + 1) / POOL_SIZE];
-};
-
-class ConvLayer {
+class ConvolutionalLayer {
 public:
-    Neuron neurons[(IMAGE_SIZE - CONV_FILTER_SIZE + 1) / POOL_SIZE][(IMAGE_SIZE - CONV_FILTER_SIZE + 1) / POOL_SIZE];
+    vector<vector<vector<double>>> filters; // Filters of the convolutional layer
+    int num_filters; // Number of filters
+    int filter_size; // Size of each filter (assuming square filters)
+    int stride; // Stride of the convolution operation
 
-    ConvLayer() {
-        initialize();
-    }
+    // Constructor
+    ConvolutionalLayer(int num_filters, int filter_size, int stride, int padding);
 
-    void initialize();
-    ConvOutput conv_forward(const double input_image[][IMAGE_SIZE]) const;
-    ConvOutput max_pooling_forward(const ConvOutput& conv_output) const;
-    void update_weights(const double input_image[][IMAGE_SIZE], const double target[], double learning_rate);
+    // Function to apply convolution operation
+    vector<vector<double>> apply_convolution(const vector<vector<double>>& input);
 
 private:
-    double convolution(const double input_patch[][CONV_FILTER_SIZE], const Neuron& neuron) const;
-    double relu(double x) const;
+    // Function to randomize filter weights
+    void randomize_filters();
 };
-#endif /* CONV_LAYER_H */
+
+#endif // CONV_LAYER_H
