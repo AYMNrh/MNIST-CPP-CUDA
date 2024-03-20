@@ -66,7 +66,8 @@ void layer_builder(int size, int size_input, double** l_p, double** l_b) {
 }
 
 __global__ void layerInfKernel(double* l_p, double* l_b, int num_outputs, double* neurons, int num_inputs, double* output) {
-    int j = blockIdx.x;
+    int j = threadIdx.x;
+
     output[j] = l_b[j];
     for (int i = 0; i < num_inputs; i++) {
         output[j] += neurons[i] * l_p[j * num_inputs + i];
@@ -86,7 +87,7 @@ double* layer_inf_cuda(double* l_p, double* l_b, int num_outputs, double* neuron
     cudaMemcpy(d_l_b, l_b, num_outputs * sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(d_neurons, neurons, num_inputs * sizeof(double), cudaMemcpyHostToDevice);
 
-    layerInfKernel << <num_outputs, 1 >> > (d_l_p, d_l_b, num_outputs, d_neurons, num_inputs, d_output);
+    layerInfKernel <<<1, num_outputs >> > (d_l_p, d_l_b, num_outputs, d_neurons, num_inputs, d_output);
 
     cudaMemcpy(output, d_output, num_outputs * sizeof(double), cudaMemcpyDeviceToHost);
 
