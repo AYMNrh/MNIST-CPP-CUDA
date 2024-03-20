@@ -10,7 +10,7 @@ using namespace std;
 int detect_class(vector<double> output){
     double max = 0;
     int output_class;
-    for (int i; i<output.size(); i++) {
+    for (int i=0; i<output.size(); i++) {
         if (output[i]>max){
             max = output[i];
             output_class = i;
