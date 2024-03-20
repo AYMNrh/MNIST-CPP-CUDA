@@ -7,6 +7,23 @@
 
 using namespace std;
 
+void printProgressBar(double progress) {
+    const int barWidth = 70;
+
+    int pos = barWidth * progress;
+
+    printf("[");
+    for (int i = 0; i < barWidth; ++i) {
+        if (i < pos)
+            printf("=");
+        else if (i == pos)
+            printf(">");
+        else
+            printf(" ");
+    }
+    printf("] %.2f%%", progress * 100);
+}
+
 int detect_class(vector<double> output){
     double max = 0;
     int output_class;
@@ -110,9 +127,9 @@ int main() {
                 real_output[9]=1;
                 break;
             default:
-                cout << "Invalid label value" << endl;
                 break;
         }
+        cout << train_label << endl;
         real_outputs[i] = real_output;
     }
 
@@ -122,22 +139,30 @@ int main() {
     // Initialize dense layer
     DenseLayer dense_layer(100, 10);
 
+    // Initialize accuracy
+    double accuracy = 0.0;
+
     for (int i=0; i<train_images.size(); i++) {
         vector<vector<vector<double>>> convolution_output = conv_layer.apply_convolution(train_images[i]);
-        cout << "convolution height : " << convolution_output[0][0].size() << "   convolution weight : " << convolution_output[0].size() << "  num filters " << convolution_output.size()<< endl;
         vector<vector<vector<double>>> pooling_output = max_pooling(convolution_output, 2);
-        cout << "pooling height : " << pooling_output[0][0].size() << "   pooling weight : " << pooling_output[0].size() << "  num filters " << pooling_output.size() << endl;
         vector<double> flattened_output = flatten(pooling_output);
-        cout << "flattened size : " << flattened_output.size() << endl;
         vector<double> output = dense_layer.compute_output(flattened_output);
-        cout << "compute output ok" << endl;
         int output_class = detect_class(output);
-        cout << output_class << endl;
-        cout << "label value for predicted class : " << real_outputs[i][output_class] << "     predicted value : " << output_class << endl;
-    }
+        int prediction = output_class - train_labels[i];
+        if (prediction == 0) {
+            accuracy += 1;
+        }
 
+        printf("training %d: ", i + 1);
+        printProgressBar((double)(i + 1) / i);
+        printf("\n");
     // Train the CNN
 
+
+    }
+
+    // Display accuracy
+    cout << "accuracy : " << accuracy / train_images.size() << endl;
 
     return 0;
 }
