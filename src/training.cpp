@@ -1,15 +1,12 @@
 #include "training.hpp"
 
-ConvolutionalLayer convolutional_back_Propagation(ConvolutionalLayer convolutional_layer, const vector<vector<double>>& train_image, double learning_rate) {
+ConvolutionalLayer convolutional_back_Propagation(ConvolutionalLayer convolutional_layer, vector<vector<double>> train_image, vector<vector<vector<double>>> conv_output, double learning_rate) {
     int num_filters = convolutional_layer.num_filters;
     int filter_size = convolutional_layer.filter_size;
     int stride = convolutional_layer.stride;
 
     int input_height = train_image.size();
     int input_width = train_image[0].size();
-
-    // Apply convolution operation on the image
-    vector<vector<vector<double>>> conv_output = convolutional_layer.apply_convolution(train_image);
 
     // Initialize gradients for filters
     vector<vector<vector<double>>> filter_gradients(num_filters, vector<vector<double>>(filter_size, vector<double>(filter_size, 0.0)));
@@ -23,7 +20,7 @@ ConvolutionalLayer convolutional_back_Propagation(ConvolutionalLayer convolution
                         int input_i = i * stride + u;
                         int input_j = j * stride + v;
                         if (input_i >= 0 && input_i < input_height && input_j >= 0 && input_j < input_width) {
-                            filter_gradients[k][u][v] += train_image[i][j] * conv_output[k][i][j];
+                            filter_gradients[k][u][v] += train_image[i][j] * conv_output[k][u][v];
                         }
                     }
                 }
@@ -56,7 +53,7 @@ double crossentropy_error(const vector<int> training_label, const vector<double>
     return -sum;
 }
 
-DenseLayer dense_back_Propagation(DenseLayer dense_layer, const vector<vector<vector<double>>> train_images, const vector<int> training_label, double learning_rate) {
+DenseLayer dense_back_Propagation(DenseLayer dense_layer, uint8_t* training_label, double learning_rate) {
     for (int i = 0; i < dense_layer.num_neurons; i++) {
         Neuron& neuron = dense_layer.neurons[i];
         for (int j = 0; j < neuron.num_inputs; j++) {
