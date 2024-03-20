@@ -1,10 +1,44 @@
 #include "training.hpp"
 
-using namespace std;
+ConvolutionalLayer convolutional_back_Propagation(ConvolutionalLayer convolutional_layer, const vector<vector<double>>& train_image, double learning_rate) {
+    int num_filters = convolutional_layer.num_filters;
+    int filter_size = convolutional_layer.filter_size;
+    int stride = convolutional_layer.stride;
 
-// TODO
-ConvolutionalLayer convolutional_back_Propagation(ConvolutionalLayer convolutional_layer, const vector<vector<vector<double>>> train_images) {
-    // TODO
+    int input_height = train_image.size();
+    int input_width = train_image[0].size();
+
+    // Apply convolution operation on the image
+    vector<vector<double>> conv_output = convolutional_layer.apply_convolution(train_image);
+
+    // Initialize gradients for filters
+    vector<vector<vector<double>>> filter_gradients(num_filters, vector<vector<double>>(filter_size, vector<double>(filter_size, 0.0)));
+
+    // Compute gradients for filters
+    for (int k = 0; k < num_filters; ++k) {
+        for (int u = 0; u < filter_size; ++u) {
+            for (int v = 0; v < filter_size; ++v) {
+                for (int i = 0; i < input_height; ++i) {
+                    for (int j = 0; j < input_width; ++j) {
+                        int input_i = i * stride + u;
+                        int input_j = j * stride + v;
+                        if (input_i >= 0 && input_i < input_height && input_j >= 0 && input_j < input_width) {
+                            filter_gradients[k][u][v] += train_image[i][j] * conv_output[i][j];
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Update filter weights
+    for (int k = 0; k < num_filters; ++k) {
+        for (int u = 0; u < filter_size; ++u) {
+            for (int v = 0; v < filter_size; ++v) {
+                convolutional_layer.filters[k][u][v] -= learning_rate * filter_gradients[k][u][v];
+            }
+        }
+    }
 
     return convolutional_layer;
 }
@@ -31,7 +65,3 @@ DenseLayer dense_back_Propagation(DenseLayer dense_layer, const vector<vector<ve
     }
     return dense_layer;
 }
-
-
-
-

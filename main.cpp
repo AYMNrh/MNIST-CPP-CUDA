@@ -96,6 +96,7 @@ int main() {
                 break;
             case 5:
                 real_output[5]=1;
+                break;
             case 6:
                 real_output[6]=1;
                 break;
