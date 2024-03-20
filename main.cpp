@@ -118,16 +118,21 @@ int main() {
 
     // Initialize convolutional layer
     ConvolutionalLayer conv_layer(32, 3, 1);
-
+    
     // Initialize dense layer
-    DenseLayer dense_layer(25088, 10);
+    DenseLayer dense_layer(100, 10);
 
     for (int i=0; i<train_images.size(); i++) {
-        vector<vector<double>> convolution_output = conv_layer.apply_convolution(train_images[i]);
-        vector<vector<double>> pooling_output = max_pooling(convolution_output, 2);
+        vector<vector<vector<double>>> convolution_output = conv_layer.apply_convolution(train_images[i]);
+        cout << "convolution height : " << convolution_output[0][0].size() << "   convolution weight : " << convolution_output[0].size() << "  num filters " << convolution_output.size()<< endl;
+        vector<vector<vector<double>>> pooling_output = max_pooling(convolution_output, 2);
+        cout << "pooling height : " << pooling_output[0][0].size() << "   pooling weight : " << pooling_output[0].size() << "  num filters " << pooling_output.size() << endl;
         vector<double> flattened_output = flatten(pooling_output);
+        cout << "flattened size : " << flattened_output.size() << endl;
         vector<double> output = dense_layer.compute_output(flattened_output);
+        cout << "compute output ok" << endl;
         int output_class = detect_class(output);
+        cout << output_class << endl;
         cout << "label value for predicted class : " << real_outputs[i][output_class] << "     predicted value : " << output_class << endl;
     }
 
