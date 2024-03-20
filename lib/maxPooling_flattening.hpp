@@ -7,9 +7,9 @@
 using namespace std;
 
 // Function to perform max pooling
-vector<vector<double>> max_pooling(const vector<vector<double>>& input, int pool_size);
+vector<vector<vector<double>>> max_pooling(const vector<vector<vector<double>>>& input, int pool_size);
 
 // Function for flattening max pooling outputs
-vector<double> flatten(vector<vector<double>>& inputs);
+vector<double> flatten(vector<vector<vector<double>>>& inputs);
 
 #endif

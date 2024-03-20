@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
+#include <iostream>
 
 using namespace std;
 
@@ -19,7 +20,7 @@ public:
     ConvolutionalLayer(int num_filters, int filter_size, int stride);
 
     // Function to apply convolution operation
-    vector<vector<double>> apply_convolution(const vector<vector<double>>& input);
+    vector<vector<vector<double>>> apply_convolution(const vector<vector<double>>& input);
 
 private:
     // Function to randomize filter weights

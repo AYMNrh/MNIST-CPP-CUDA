@@ -9,7 +9,7 @@ ConvolutionalLayer convolutional_back_Propagation(ConvolutionalLayer convolution
     int input_width = train_image[0].size();
 
     // Apply convolution operation on the image
-    vector<vector<double>> conv_output = convolutional_layer.apply_convolution(train_image);
+    vector<vector<vector<double>>> conv_output = convolutional_layer.apply_convolution(train_image);
 
     // Initialize gradients for filters
     vector<vector<vector<double>>> filter_gradients(num_filters, vector<vector<double>>(filter_size, vector<double>(filter_size, 0.0)));
@@ -23,7 +23,7 @@ ConvolutionalLayer convolutional_back_Propagation(ConvolutionalLayer convolution
                         int input_i = i * stride + u;
                         int input_j = j * stride + v;
                         if (input_i >= 0 && input_i < input_height && input_j >= 0 && input_j < input_width) {
-                            filter_gradients[k][u][v] += train_image[i][j] * conv_output[i][j];
+                            filter_gradients[k][u][v] += train_image[i][j] * conv_output[k][i][j];
                         }
                     }
                 }

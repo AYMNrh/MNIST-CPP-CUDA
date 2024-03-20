@@ -26,7 +26,7 @@ void ConvolutionalLayer::randomize_filters() {
 }
 
 // Function to apply convolution operation
-vector<vector<double>> ConvolutionalLayer::apply_convolution(const vector<vector<double>>& input) {
+vector<vector<vector<double>>> ConvolutionalLayer::apply_convolution(const vector<vector<double>>& input) {
     // Number of rows and columns in input
     int input_height = input.size();
     int input_width = input[0].size();
@@ -35,8 +35,8 @@ vector<vector<double>> ConvolutionalLayer::apply_convolution(const vector<vector
     int output_width = (input_width - filter_size) / stride + 1;
 
     // Initialize the output matrix with zeros
-    vector<vector<double>> output(output_height, vector<double>(output_width, 0.0));
-
+    vector<vector<vector<double>>> output(num_filters, vector<vector<double>>(output_height, vector<double>(output_width, 0.0)));
+    
     // Loop through each filter
     for (int k = 0; k < num_filters; ++k) {
         // Loop through each row of the output
@@ -59,7 +59,7 @@ vector<vector<double>> ConvolutionalLayer::apply_convolution(const vector<vector
                     }
                 }
                 // Update the output matrix with the accumulated sum
-                output[i][j] += sum;
+                output[k][i][j] += sum;
             }
         }
     }
