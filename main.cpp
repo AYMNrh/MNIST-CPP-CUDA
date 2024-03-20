@@ -1,11 +1,64 @@
 #include <iostream>
 #include <fstream>
+#include <cstdint>
+#include <string>
 #include "neuron.hpp"
 #include "dense.hpp"
 #include "conv_layer.hpp"
-#include "maxPooling_flattening.hpp" 
+#include "maxPooling_flattening.hpp"
+#include "training.hpp"
 
 using namespace std;
+
+#define MNIST_IMAGE_SIZE 28 * 28
+#define MNIST_NUM_IMAGES 60000
+#define MNIST_NUM_LABELS 10
+#define MNIST_NUM_IMAGES_TEST 9000
+
+void read_mnist_images(const char* image_file_path, uint8_t** images, int num_images) {
+    FILE* file = fopen(image_file_path, "rb");
+    if (file == NULL) {
+        printf("Error opening file: %s\n", image_file_path);
+        return;
+    }
+
+    uint32_t magic_number, num_images_file;
+    fread(&magic_number, sizeof(uint32_t), 1, file);
+    fread(&num_images_file, sizeof(uint32_t), 1, file);
+
+    uint32_t rows, cols;
+    fread(&rows, sizeof(uint32_t), 1, file);
+    fread(&cols, sizeof(uint32_t), 1, file);
+
+    for (int i = 0; i < num_images; i++) {
+        fread(images[i], sizeof(uint8_t), MNIST_IMAGE_SIZE, file);
+    }
+
+    fclose(file);
+}
+
+void read_mnist_labels(const char* label_file_path, uint8_t* labels, uint8_t** one_hot_labels, int num_labels) {
+    FILE* file = fopen(label_file_path, "rb");
+    if (file == NULL) {
+        printf("Error opening file: %s\n", label_file_path);
+        return;
+    }
+
+    uint32_t magic_number, num_labels_file;
+    fread(&magic_number, sizeof(uint32_t), 1, file);
+    fread(&num_labels_file, sizeof(uint32_t), 1, file);
+
+    for (int i = 0; i < num_labels; i++) {
+        uint8_t label;
+        fread(&label, sizeof(uint8_t), 1, file);
+        labels[i] = label;
+        for (int j = 0; j < MNIST_NUM_LABELS; j++) {
+            one_hot_labels[i][j] = (j == label) ? 1 : 0;
+        }
+    }
+
+    fclose(file);
+}
 
 void printProgressBar(double progress) {
     const int barWidth = 70;
@@ -24,11 +77,11 @@ void printProgressBar(double progress) {
     printf("] %.2f%%", progress * 100);
 }
 
-int detect_class(vector<double> output){
+int detect_class(vector<double> output) {
     double max = 0;
     int output_class;
-    for (int i=0; i<output.size(); i++) {
-        if (output[i]>max){
+    for (int i = 0; i < output.size(); i++) {
+        if (output[i] > max) {
             max = output[i];
             output_class = i;
         }
@@ -36,133 +89,69 @@ int detect_class(vector<double> output){
     return output_class;
 }
 
-// Function to read MNIST images
-vector<vector<vector<double>>> read_images(const string& file_path, int num_images, int num_rows, int num_cols) {
-    ifstream file(file_path, ios::binary);
-
-    vector<vector<vector<double>>> images(num_images, vector<vector<double>>(num_rows, vector<double>(num_cols)));
-
-    // Read pixel values
-    for (int i = 0; i < num_images; ++i) {
-        for (int r = 0; r < num_rows; ++r) {
-            for (int c = 0; c < num_cols; ++c) {
-                unsigned char pixel_value;
-                file.read(reinterpret_cast<char*>(&pixel_value), sizeof(pixel_value));
-                images[i][r][c] = static_cast<double>(pixel_value) / 255.0; // Normalize pixel values
-            }
-        }
-    }
-
-    return images;
-}
-
-// Function to read MNIST labels
-vector<int> read_labels(const string& file_path, int num_labels) {
-    ifstream file(file_path, ios::binary);
-
-    vector<int> labels(num_labels);
-
-    // Read labels
-    for (int i = 0; i < num_labels; ++i) {
-        unsigned char label;
-        file.read(reinterpret_cast<char*>(&label), sizeof(label));
-        labels[i] = static_cast<int>(label);
-    }
-
-    return labels;
-}
-
 int main() {
-
-    // MNIST dataset paths
-    const string train_images_path = "data/train-images-idx3-ubyte";
-    const string train_labels_path = "data/train-labels-idx1-ubyte";
-    const string test_images_path = "data/t10k-images-idx3-ubyte";
-    const string test_labels_path = "data/t10k-labels-idx1-ubyte";
-
-
-    vector<vector<vector<double>>> train_images = read_images(train_images_path, 60000, 28, 28);
-    vector<int> train_labels = read_labels(train_labels_path, 60000);
-    vector<vector<vector<double>>> test_images = read_images(test_images_path, 10000, 28, 28);
-    vector<int> test_labels = read_labels(test_labels_path, 10000);
-
-    // Transform labels in vectors which can be compared to the output
-    vector<vector<int>>real_outputs(train_labels.size());
-    
-    // Loop over training labels
-    for(int i=0; i<train_labels.size(); i++) {
-        // Initialize vector
-        vector<int> real_output(10, 0);
-        int train_label = train_labels[i];
-        // set 1 to the appropriate index of real output
-        switch(train_label) {
-            case 0:
-                real_output[0]=1;
-                break;
-            case 1:
-                real_output[1]=1;
-                break;
-            case 2:
-                real_output[2]=1;
-                break;
-            case 3:
-                real_output[3]=1;
-                break;
-            case 4:
-                real_output[4]=1;
-                break;
-            case 5:
-                real_output[5]=1;
-                break;
-            case 6:
-                real_output[6]=1;
-                break;
-            case 7:
-                real_output[7]=1;
-                break;
-            case 8:
-                real_output[8]=1;
-                break;
-            case 9:
-                real_output[9]=1;
-                break;
-            default:
-                break;
-        }
-        cout << train_label << endl;
-        real_outputs[i] = real_output;
-    }
 
     // Initialize convolutional layer
     ConvolutionalLayer conv_layer(32, 3, 1);
-    
+
     // Initialize dense layer
     DenseLayer dense_layer(100, 10);
 
     // Initialize accuracy
     double accuracy = 0.0;
 
-    for (int i=0; i<train_images.size(); i++) {
-        vector<vector<vector<double>>> convolution_output = conv_layer.apply_convolution(train_images[i]);
+    // Load training data
+    uint8_t** images = (uint8_t**)malloc(MNIST_NUM_IMAGES_TEST * sizeof(uint8_t*));
+    for (int i = 0; i < MNIST_NUM_IMAGES_TEST; i++) {
+        images[i] = (uint8_t*)malloc(MNIST_IMAGE_SIZE * sizeof(uint8_t));
+    }
+    uint8_t** one_hot_labels = (uint8_t**)malloc(MNIST_NUM_IMAGES_TEST * sizeof(uint8_t*));
+    for (int i = 0; i < MNIST_NUM_IMAGES_TEST; i++) {
+        one_hot_labels[i] = (uint8_t*)malloc(MNIST_NUM_LABELS * sizeof(uint8_t));
+    }
+    uint8_t* labels = (uint8_t*)malloc(MNIST_NUM_IMAGES_TEST * sizeof(uint8_t));
+
+    printf("Loading training data...\n");
+    read_mnist_images("../data/train-images.idx3-ubyte", images, MNIST_NUM_IMAGES_TEST);
+    read_mnist_labels("../data/train-labels.idx1-ubyte", labels, one_hot_labels, MNIST_NUM_IMAGES_TEST);
+
+    vector<vector<vector<double>>> training_images(MNIST_NUM_IMAGES, vector<vector<double>>(28, vector<double>(28)));
+    for (int n=0; n<MNIST_NUM_IMAGES; ++n){
+        for (int i = 0; i < 28; ++i) {
+            for (int j = 0; j < 28; ++j) {
+                // Cast each uint8_t value to double and assign it to the corresponding position in the result vector
+                training_images[n][i][j] = images[i][j];
+                if (images[n][i] != 0){
+                    cout << "training_images : " << training_images[n][i][j] << endl;
+                    cout << "training_images : " << images[n][i] << endl;
+                }  
+            }
+        }
+    }
+
+    // Loop over training labels
+    for (int i = 0; i < MNIST_NUM_IMAGES; i++) {
+        vector<vector<vector<double>>> convolution_output = conv_layer.apply_convolution(training_images[i]);
         vector<vector<vector<double>>> pooling_output = max_pooling(convolution_output, 2);
         vector<double> flattened_output = flatten(pooling_output);
         vector<double> output = dense_layer.compute_output(flattened_output);
         int output_class = detect_class(output);
-        int prediction = output_class - train_labels[i];
-        if (prediction == 0) {
+        //cout << "predicted output : " << output_class << "   label : " << labels[i] << endl;
+        if (output[output_class] == one_hot_labels[i][output_class]) {
             accuracy += 1;
         }
-
-        printf("training %d: ", i + 1);
-        printProgressBar((double)(i + 1) / i);
-        printf("\n");
-    // Train the CNN
-
-
     }
 
-    // Display accuracy
-    cout << "accuracy : " << accuracy / train_images.size() << endl;
+    // Free allocated memory
+    for (int i = 0; i < MNIST_NUM_IMAGES_TEST; i++) {
+        free(images[i]);
+        free(one_hot_labels[i]);
+    }
+    
+    free(images);
+    free(one_hot_labels);
+    free(labels);
 
-    return 0;
-}
+    // Display accuracy
+    cout << "Accuracy : " << accuracy / MNIST_IMAGE_SIZE;
+};
