@@ -1,8 +1,9 @@
 #include <iostream>
 #include <fstream>
-#include "dense.h"
-#include "conv_layer.h"
-#include "maxPooling_flattening.h" 
+#include "neuron.hpp"
+#include "dense.hpp"
+#include "conv_layer.hpp"
+#include "maxPooling_flattening.hpp" 
 
 using namespace std;
 

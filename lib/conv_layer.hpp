@@ -2,6 +2,9 @@
 #define CONV_LAYER_H
 
 #include <vector>
+#include <cmath>
+#include <cstdlib>
+#include <ctime>
 
 using namespace std;
 
@@ -23,4 +26,4 @@ private:
     void randomize_filters();
 };
 
-#endif // CONV_LAYER_H
+#endif

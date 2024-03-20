@@ -1,6 +1,4 @@
-#include <vector>   // Include vector for vector data structure
-#include <algorithm> // Include algorithm for max function
-#include "maxPooling_flattening.h"  // Include the header file
+#include "maxPooling_flattening.hpp"  // Include the header file
 
 using namespace std;
 

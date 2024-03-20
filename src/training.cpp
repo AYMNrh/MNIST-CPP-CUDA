@@ -1,9 +1,4 @@
-#include <vector>
-#include <list>
-#include <iostream>
-#include <cmath>
-#include "dense.h"
-#include "conv_layer.h" 
+#include "training.hpp"
 
 using namespace std;
 

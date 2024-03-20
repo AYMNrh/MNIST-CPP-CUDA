@@ -1,8 +1,9 @@
 #ifndef DENSE_H
 #define DENSE_H
 
-#include <vector>
-#include "neuron.h"
+#include <vector> 
+#include <cmath>
+#include "neuron.hpp"
 
 using namespace std;
 
@@ -13,17 +14,15 @@ public:
     vector<double> derivative; // Derivative of each neurons output for back propagation
 
 public:
-    // Default constructor
-    DenseLayer();
 
     // Parameterized constructor
     DenseLayer(int num_inputs, int num_neurons);
 
     // Softmax function
-    vector<double> softmax(const vector<double>& inputs);
+    vector<double> softmax(vector<double>& inputs);
 
     // Derivative function
-    vector<double> calculate_derivative(vector<double> outputs);
+    vector<double> calculate_derivative(vector<double>& outputs);
 
     // Function to compute the output of the layer given inputs
     vector<double> compute_output(vector<double>& inputs);
