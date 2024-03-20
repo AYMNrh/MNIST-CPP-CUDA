@@ -216,15 +216,13 @@ void train_model(double* l1p, double* l1b, double* l2p, double* l2b, int size_in
     for (int epoch = 0; epoch < epochs; epoch++) {
         double total_loss = 0.0;
 
-        // printf("Epoch %d: ", epoch + 1);
-        // printProgressBar((double)(epoch + 1) / epochs);
-        // printf("\n");
+        printf("Epoch %d: ", epoch + 1);
+        printProgressBar((double)(epoch + 1) / epochs);
+        printf("\n");
 
 
         for (int i = 0; i < MNIST_NUM_IMAGES; i++) {
-        printf("Epoch %d: ", epoch + 1);
-        printProgressBar((double)(epoch + 1) / epochs);
-        printf("\n");    
+  
             // Forward pass
             double* input_data = (double*)malloc(MNIST_IMAGE_SIZE * sizeof(double));
             double* output;
@@ -333,9 +331,19 @@ int main() {
     double *l1p, *l1b, *l2p, *l2b;
     custom_MLP_2l_build(MNIST_IMAGE_SIZE, 128, MNIST_NUM_LABELS, &l1p, &l1b, &l2p, &l2b);
 
+    // Measure time taken for training
+    clock_t start_time = clock(); // Record start time
+
     // Train the model
     printf("Training the model...\n");
-    train_model(l1p, l1b, l2p, l2b, MNIST_IMAGE_SIZE, 128, MNIST_NUM_LABELS, 0.001, 10);
+    train_model(l1p, l1b, l2p, l2b, MNIST_IMAGE_SIZE, 128, MNIST_NUM_LABELS, 0.001, 15);
+
+    clock_t end_time = clock(); // Record end time
+
+    // Calculate elapsed time
+    double elapsed_time = ((double) (end_time - start_time)) / CLOCKS_PER_SEC;
+
+    printf("Training completed in %.2f seconds\n", elapsed_time);
 
     // Evaluate model
     printf("Evaluating the model...\n");
