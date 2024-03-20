@@ -9,6 +9,61 @@
 #define MNIST_NUM_LABELS 10
 #define MNIST_NUM_IMAGES_TEST 9000
 
+#define BLOCK_SIZE 16
+
+double relu_derivative(double x);
+
+__global__ void matrixMultiply(double* a, double* b, double* c, int rowsA, int colsA, int colsB) {
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (row < rowsA && col < colsB) {
+        double sum = 0.0;
+        for (int k = 0; k < colsA; k++) {
+            sum += a[row * colsA + k] * b[k * colsB + col];
+        }
+        c[row * colsB + col] = sum;
+    }
+}
+
+double* layer_inf(double* l_p, double* l_b, int num_outputs, double* neurons, int num_inputs) {
+    double* output;
+    double *d_l_p, *d_neurons, *d_output;
+    double *d_l_b;
+
+    // Allocate memory on device
+    cudaMalloc(&d_l_p, num_outputs * num_inputs * sizeof(double));
+    cudaMalloc(&d_neurons, num_inputs * sizeof(double));
+    cudaMalloc(&d_output, num_outputs * sizeof(double));
+    cudaMalloc(&d_l_b, num_outputs * sizeof(double));
+
+    // Copy data from host to device
+    cudaMemcpy(d_l_p, l_p, num_outputs * num_inputs * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_neurons, neurons, num_inputs * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_l_b, l_b, num_outputs * sizeof(double), cudaMemcpyHostToDevice);
+
+    // Define grid and block dimensions
+    dim3 dimGrid((num_outputs + BLOCK_SIZE - 1) / BLOCK_SIZE, 1);
+    dim3 dimBlock(BLOCK_SIZE, 1);
+
+    // Launch the CUDA kernel
+    matrixMultiply<<<dimGrid, dimBlock>>>(d_l_p, d_neurons, d_output, num_outputs, num_inputs, 1);
+
+    // Allocate memory for output on host
+    output = (double*)malloc(num_outputs * sizeof(double));
+
+    // Copy the result back to host
+    cudaMemcpy(output, d_output, num_outputs * sizeof(double), cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_l_p);
+    cudaFree(d_neurons);
+    cudaFree(d_output);
+    cudaFree(d_l_b);
+
+    return output;
+}
+
 double relu_derivative(double x);
 // Function declarations
 void printProgressBar(double progress);
@@ -310,18 +365,18 @@ void printProgressBar(double progress) {
 }
 
 int main() {
-    srand(66); // Initialize random seed
-
+    srand(66);  
+    
     // Load training data
-    uint8_t **images = (uint8_t **)malloc(MNIST_NUM_IMAGES_TEST * sizeof(uint8_t *));
+    uint8_t** images = (uint8_t**)malloc(MNIST_NUM_IMAGES_TEST * sizeof(uint8_t*));
     for (int i = 0; i < MNIST_NUM_IMAGES_TEST; i++) {
-        images[i] = (uint8_t *)malloc(MNIST_IMAGE_SIZE * sizeof(uint8_t));
+        images[i] = (uint8_t*)malloc(MNIST_IMAGE_SIZE * sizeof(uint8_t));
     }
-    uint8_t **one_hot_labels = (uint8_t **)malloc(MNIST_NUM_IMAGES_TEST * sizeof(uint8_t *));
+    uint8_t** one_hot_labels = (uint8_t**)malloc(MNIST_NUM_IMAGES_TEST * sizeof(uint8_t*));
     for (int i = 0; i < MNIST_NUM_IMAGES_TEST; i++) {
-        one_hot_labels[i] = (uint8_t *)malloc(MNIST_NUM_LABELS * sizeof(uint8_t));
+        one_hot_labels[i] = (uint8_t*)malloc(MNIST_NUM_LABELS * sizeof(uint8_t));
     }
-    uint8_t *labels = (uint8_t *)malloc(MNIST_NUM_IMAGES_TEST * sizeof(uint8_t));
+    uint8_t* labels = (uint8_t*)malloc(MNIST_NUM_IMAGES_TEST * sizeof(uint8_t));
 
     printf("Loading training data...\n");
     read_mnist_images("train-images.idx3-ubyte", images, MNIST_NUM_IMAGES_TEST);
@@ -329,12 +384,7 @@ int main() {
 
     // Build model
     double *l1p, *l1b, *l2p, *l2b;
-    cudaMallocManaged(&l1p, MNIST_IMAGE_SIZE * 128 * sizeof(double));
-    cudaMallocManaged(&l1b, 128 * sizeof(double));
-    cudaMallocManaged(&l2p, 128 * MNIST_NUM_LABELS * sizeof(double));
-    cudaMallocManaged(&l2b, MNIST_NUM_LABELS * sizeof(double));
-
-    custom_MLP_2l_build(MNIST_IMAGE_SIZE, 128, MNIST_NUM_LABELS, l1p, l1b, l2p, l2b);
+    custom_MLP_2l_build(MNIST_IMAGE_SIZE, 128, MNIST_NUM_LABELS, &l1p, &l1b, &l2p, &l2b);
 
     // Measure time taken for training
     clock_t start_time = clock(); // Record start time
@@ -346,7 +396,7 @@ int main() {
     clock_t end_time = clock(); // Record end time
 
     // Calculate elapsed time
-    double elapsed_time = ((double)(end_time - start_time)) / CLOCKS_PER_SEC;
+    double elapsed_time = ((double) (end_time - start_time)) / CLOCKS_PER_SEC;
 
     printf("Training completed in %.2f seconds\n", elapsed_time);
 
@@ -363,10 +413,10 @@ int main() {
     free(images);
     free(one_hot_labels);
     free(labels);
-    cudaFree(l1p);
-    cudaFree(l1b);
-    cudaFree(l2p);
-    cudaFree(l2b);
+    free(l1p);
+    free(l1b);
+    free(l2p);
+    free(l2b);
 
     return 0;
 }
