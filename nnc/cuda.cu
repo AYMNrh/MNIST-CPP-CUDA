@@ -9,61 +9,6 @@
 #define MNIST_NUM_LABELS 10
 #define MNIST_NUM_IMAGES_TEST 9000
 
-#define BLOCK_SIZE 16
-
-double relu_derivative(double x);
-
-__global__ void matrixMultiply(double* a, double* b, double* c, int rowsA, int colsA, int colsB) {
-    int row = blockIdx.y * blockDim.y + threadIdx.y;
-    int col = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if (row < rowsA && col < colsB) {
-        double sum = 0.0;
-        for (int k = 0; k < colsA; k++) {
-            sum += a[row * colsA + k] * b[k * colsB + col];
-        }
-        c[row * colsB + col] = sum;
-    }
-}
-
-double* layer_inf(double* l_p, double* l_b, int num_outputs, double* neurons, int num_inputs) {
-    double* output;
-    double *d_l_p, *d_neurons, *d_output;
-    double *d_l_b;
-
-    // Allocate memory on device
-    cudaMalloc(&d_l_p, num_outputs * num_inputs * sizeof(double));
-    cudaMalloc(&d_neurons, num_inputs * sizeof(double));
-    cudaMalloc(&d_output, num_outputs * sizeof(double));
-    cudaMalloc(&d_l_b, num_outputs * sizeof(double));
-
-    // Copy data from host to device
-    cudaMemcpy(d_l_p, l_p, num_outputs * num_inputs * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_neurons, neurons, num_inputs * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_l_b, l_b, num_outputs * sizeof(double), cudaMemcpyHostToDevice);
-
-    // Define grid and block dimensions
-    dim3 dimGrid((num_outputs + BLOCK_SIZE - 1) / BLOCK_SIZE, 1);
-    dim3 dimBlock(BLOCK_SIZE, 1);
-
-    // Launch the CUDA kernel
-    matrixMultiply<<<dimGrid, dimBlock>>>(d_l_p, d_neurons, d_output, num_outputs, num_inputs, 1);
-
-    // Allocate memory for output on host
-    output = (double*)malloc(num_outputs * sizeof(double));
-
-    // Copy the result back to host
-    cudaMemcpy(output, d_output, num_outputs * sizeof(double), cudaMemcpyDeviceToHost);
-
-    // Free device memory
-    cudaFree(d_l_p);
-    cudaFree(d_neurons);
-    cudaFree(d_output);
-    cudaFree(d_l_b);
-
-    return output;
-}
-
 double relu_derivative(double x);
 // Function declarations
 void printProgressBar(double progress);
@@ -120,6 +65,39 @@ void layer_builder(int size, int size_input, double** l_p, double** l_b) {
     printf("Number of params for layer: %d\n", size * size_input);
 }
 
+__global__ void layerInfKernel(double* l_p, double* l_b, int num_outputs, double* neurons, int num_inputs, double* output) {
+    int j = blockIdx.x;
+    output[j] = l_b[j];
+    for (int i = 0; i < num_inputs; i++) {
+        output[j] += neurons[i] * l_p[j * num_inputs + i];
+    }
+}
+
+double* layer_inf_cuda(double* l_p, double* l_b, int num_outputs, double* neurons, int num_inputs) {
+    double* output = (double*)malloc(num_outputs * sizeof(double));
+    double* d_l_p, * d_l_b, * d_neurons, * d_output;
+
+    cudaMalloc(&d_l_p, num_outputs * num_inputs * sizeof(double));
+    cudaMalloc(&d_l_b, num_outputs * sizeof(double));
+    cudaMalloc(&d_neurons, num_inputs * sizeof(double));
+    cudaMalloc(&d_output, num_outputs * sizeof(double));
+
+    cudaMemcpy(d_l_p, l_p, num_outputs * num_inputs * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_l_b, l_b, num_outputs * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_neurons, neurons, num_inputs * sizeof(double), cudaMemcpyHostToDevice);
+
+    layerInfKernel << <num_outputs, 1 >> > (d_l_p, d_l_b, num_outputs, d_neurons, num_inputs, d_output);
+
+    cudaMemcpy(output, d_output, num_outputs * sizeof(double), cudaMemcpyDeviceToHost);
+
+    cudaFree(d_l_p);
+    cudaFree(d_l_b);
+    cudaFree(d_neurons);
+    cudaFree(d_output);
+
+    return output;
+}
+
 double* layer_inf(double* l_p, double* l_b, int num_outputs, double* neurons, int num_inputs) {
     double* output = (double*)malloc(num_outputs * sizeof(double));
 
@@ -132,6 +110,8 @@ double* layer_inf(double* l_p, double* l_b, int num_outputs, double* neurons, in
 
     return output;
 }
+
+
 
 void read_mnist_images(const char* image_file_path, uint8_t** images, int num_images) {
     FILE* file = fopen(image_file_path, "rb");
@@ -189,9 +169,9 @@ double* custom_MLP_2l_inf(double* input_data, int size_input, int size_l2, int s
     double* n1 = (double*)malloc(size_l2 * sizeof(double));
     double* n2 = (double*)malloc(size_output * sizeof(double));
 
-    n1 = layer_inf(l1p, l1b, size_l2, input_data, size_input);
+    n1 = layer_inf_cuda(l1p, l1b, size_l2, input_data, size_input);
     n1 = relu(n1, size_l2);
-    n2 = layer_inf(l2p, l2b, size_output, n1, size_l2);
+    n2 = layer_inf_cuda(l2p, l2b, size_output, n1, size_l2);
     n2 = softmax(n2, size_output);
 
     free(n1);
@@ -391,7 +371,7 @@ int main() {
 
     // Train the model
     printf("Training the model...\n");
-    train_model(l1p, l1b, l2p, l2b, MNIST_IMAGE_SIZE, 128, MNIST_NUM_LABELS, 0.001, 15);
+    train_model(l1p, l1b, l2p, l2b, MNIST_IMAGE_SIZE, 128, MNIST_NUM_LABELS, 0.001, 5);
 
     clock_t end_time = clock(); // Record end time
 
