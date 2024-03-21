@@ -408,6 +408,82 @@ __global__ void trainKernel(double* l1p, double* l1b, double* l2p, double* l2b, 
     }
 }
 
+void train_model(double* l1p, double* l1b, double* l2p, double* l2b, int size_input, int size_l2, int size_output, double learning_rate, int epochs) {
+    uint8_t** train_images = (uint8_t**)malloc(MNIST_NUM_IMAGES * sizeof(uint8_t*));
+    for (int i = 0; i < MNIST_NUM_IMAGES; i++) {
+        train_images[i] = (uint8_t*)malloc(MNIST_IMAGE_SIZE * sizeof(uint8_t));
+    }
+    uint8_t** one_hot_labels = (uint8_t**)malloc(MNIST_NUM_IMAGES * sizeof(uint8_t*));
+    for (int i = 0; i < MNIST_NUM_IMAGES; i++) {
+        one_hot_labels[i] = (uint8_t*)malloc(MNIST_NUM_LABELS * sizeof(uint8_t));
+    }
+    uint8_t* labels = (uint8_t*)malloc(MNIST_NUM_IMAGES * sizeof(uint8_t));
+
+    printf("Loading training images...\n");
+    read_mnist_images("train-images.idx3-ubyte", train_images, MNIST_NUM_IMAGES);
+    printf("Loading training labels...\n");
+    read_mnist_labels("train-labels.idx1-ubyte", labels, one_hot_labels, MNIST_NUM_IMAGES);
+
+    uint8_t** d_train_images;
+    uint8_t** d_one_hot_labels;
+    cudaMalloc(&d_train_images, MNIST_NUM_IMAGES * sizeof(uint8_t*));
+    cudaMalloc(&d_one_hot_labels, MNIST_NUM_IMAGES * sizeof(uint8_t*));
+    for (int i = 0; i < MNIST_NUM_IMAGES; i++) {
+        cudaMalloc(&d_train_images[i], MNIST_IMAGE_SIZE * sizeof(uint8_t));
+        cudaMemcpy(d_train_images[i], train_images[i], MNIST_IMAGE_SIZE * sizeof(uint8_t), cudaMemcpyHostToDevice);
+        cudaMalloc(&d_one_hot_labels[i], MNIST_NUM_LABELS * sizeof(uint8_t));
+        cudaMemcpy(d_one_hot_labels[i], one_hot_labels[i], MNIST_NUM_LABELS * sizeof(uint8_t), cudaMemcpyHostToDevice);
+    }
+
+    double* d_l1p, * d_l1b, * d_l2p, * d_l2b;
+    cudaMalloc(&d_l1p, size_l2 * size_input * sizeof(double));
+    cudaMalloc(&d_l1b, size_l2 * sizeof(double));
+    cudaMalloc(&d_l2p, size_output * size_l2 * sizeof(double));
+    cudaMalloc(&d_l2b, size_output * sizeof(double));
+
+    cudaMemcpy(d_l1p, l1p, size_l2 * size_input * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_l1b, l1b, size_l2 * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_l2p, l2p, size_output * size_l2 * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_l2b, l2b, size_output * sizeof(double), cudaMemcpyHostToDevice);
+
+    for (int epoch = 0; epoch < epochs; epoch++) {
+        printf("Epoch %d: ", epoch + 1);
+        printProgressBar((double)(epoch + 1) / epochs);
+        printf("\n");
+
+        int blockSize = 256;
+        int numBlocks = (MNIST_NUM_IMAGES + blockSize - 1) / blockSize;
+        trainKernel <<<numBlocks, blockSize >>> (d_l1p, d_l1b, d_l2p, d_l2b, size_input, size_l2, size_output, learning_rate, epochs, d_train_images, d_one_hot_labels);
+    }
+
+    cudaMemcpy(l1p, d_l1p, size_l2 * size_input * sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(l1b, d_l1b, size_l2 * sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(l2p, d_l2p, size_output * size_l2 * sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(l2b, d_l2b, size_output * sizeof(double), cudaMemcpyDeviceToHost);
+
+    for (int i = 0; i < MNIST_NUM_IMAGES; i++) {
+        cudaFree(d_train_images[i]);
+        cudaFree(d_one_hot_labels[i]);
+    }
+    cudaFree(d_train_images);
+    cudaFree(d_one_hot_labels);
+    cudaFree(d_l1p);
+    cudaFree(d_l1b);
+    cudaFree(d_l2p);
+    cudaFree(d_l2b);
+    
+    // Free allocated memory
+    for (int i = 0; i < MNIST_NUM_IMAGES; i++) {
+        free(train_images[i]);
+        free(one_hot_labels[i]);
+    }
+    free(train_images);
+    free(one_hot_labels);
+    free(labels);
+}
+
+
+
 
 double relu_derivative(double x) {
     return x > 0 ? 1 : 0;
