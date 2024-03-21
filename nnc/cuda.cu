@@ -15,12 +15,11 @@ void printProgressBar(double progress);
 
 
 
-__global__ reluKernel(double* x, int size) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if (i < size) {
-        if (x[i] < 0) {
-            x[i] = 0;
+__global__ void relu_kernel(double* x, int size) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < size) {
+        if (x[idx] < 0) {
+            x[idx] = 0;
         }
     }
 }
@@ -31,38 +30,26 @@ double* relu_cuda(double* x, int size) {
     cudaMemcpy(d_x, x, size * sizeof(double), cudaMemcpyHostToDevice);
 
     int blockSize = 256;
-    int gridSize = (size + blockSize - 1) / blockSize;
-    reluKernel <<<gridSize, blockSize >>> (d_x, size);
+    int numBlocks = (size + blockSize - 1) / blockSize;
+    relu_kernel<<<numBlocks, blockSize>>>(d_x, size);
 
     cudaMemcpy(x, d_x, size * sizeof(double), cudaMemcpyDeviceToHost);
     cudaFree(d_x);
-
     return x;
 }
 
-
 // softmax cuda
-__global__ void softmaxKernel(double* x, int size) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
+__global__ void softmax_kernel(double* x, int size, double max_val) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < size) {
+        x[idx] = exp(x[idx] - max_val);
+    }
+}
 
-    if (i < size) {
-        double max = x[0];
-        double x_sum = 0;
-        for (int j = 1; j < size; j++) {
-            if (x[j] > max) {
-                max = x[j];
-            }
-        }
-        for (int j = 0; j < size; j++) {
-            x[j] = exp(x[j] - max);
-        }
-        // synchronize
-        for (int j = 0; j < size; j++) {
-            x_sum += x[j];
-        }
-        for (int j = 0; j < size; j++) {
-            x[j] = x[j] / x_sum;
-        }
+__global__ void normalize_kernel(double* x, int size, double* x_sum) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < size) {
+        x[idx] /= *x_sum;
     }
 }
 
@@ -71,21 +58,71 @@ double* softmax_cuda(double* x, int size) {
     cudaMalloc(&d_x, size * sizeof(double));
     cudaMemcpy(d_x, x, size * sizeof(double), cudaMemcpyHostToDevice);
 
+    double max_val = x[0];
+    for (int i = 1; i < size; i++) {
+        if (x[i] > max_val) {
+            max_val = x[i];
+        }
+    }
+
     int blockSize = 256;
-    int gridSize = (size + blockSize - 1) / blockSize;
-    softmaxKernel <<<gridSize, blockSize >>> (d_x, size);
+    int numBlocks = (size + blockSize - 1) / blockSize;
+    softmax_kernel<<<numBlocks, blockSize>>>(d_x, size, max_val);
+
+    double* d_x_sum;
+    cudaMalloc(&d_x_sum, sizeof(double));
+    cudaMemcpy(d_x_sum, &x[0], sizeof(double), cudaMemcpyHostToDevice);
+    for (int i = 1; i < size; i++) {
+        atomicAdd(d_x_sum, x[i]);
+    }
+
+    normalize_kernel<<<numBlocks, blockSize>>>(d_x, size, d_x_sum);
 
     cudaMemcpy(x, d_x, size * sizeof(double), cudaMemcpyDeviceToHost);
     cudaFree(d_x);
-
+    cudaFree(d_x_sum);
     return x;
 }
 
-double categorical_cross_entropy_loss(double* x, double* target, int size) {
-    double res = 0;
-    for (int i = 0; i < size; i++) {
-        res += target[i] * log(x[i] + 0.000000000000001);
+__global__ void categorical_cross_entropy_loss_kernel(double* x, double* target, int size, double* res) {
+    __shared__ double shared_res;
+    if (threadIdx.x == 0) {
+        shared_res = 0.0;
     }
+    __syncthreads();
+
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < size) {
+        atomicAdd(&shared_res, target[idx] * log(x[idx] + 0.000000000000001));
+    }
+    __syncthreads();
+
+    if (threadIdx.x == 0) {
+        atomicAdd(res, shared_res);
+    }
+}
+
+double categorical_cross_entropy_loss(double* x, double* target, int size) {
+    double* d_x, *d_target, *d_res;
+    cudaMalloc(&d_x, size * sizeof(double));
+    cudaMalloc(&d_target, size * sizeof(double));
+    cudaMalloc(&d_res, sizeof(double));
+    cudaMemset(d_res, 0, sizeof(double));
+
+    cudaMemcpy(d_x, x, size * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_target, target, size * sizeof(double), cudaMemcpyHostToDevice);
+
+    int blockSize = 256;
+    int numBlocks = (size + blockSize - 1) / blockSize;
+    categorical_cross_entropy_loss_kernel<<<numBlocks, blockSize>>>(d_x, d_target, size, d_res);
+
+    double res;
+    cudaMemcpy(&res, d_res, sizeof(double), cudaMemcpyDeviceToHost);
+
+    cudaFree(d_x);
+    cudaFree(d_target);
+    cudaFree(d_res);
+
     return res;
 }
 
