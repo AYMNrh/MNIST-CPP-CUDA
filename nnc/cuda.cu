@@ -39,17 +39,22 @@ double* relu_cuda(double* x, int size) {
 }
 
 // softmax cuda
-__global__ void softmax_kernel(double* x, int size, double max_val) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx < size) {
-        x[idx] = exp(x[idx] - max_val);
+__global__ void softmax_kernel(double* x, int size) {
+    double max_val = x[0];
+    for (int i = 1; i < size; i++) {
+        if (x[i] > max_val) {
+            max_val = x[i];
+        }
     }
-}
 
-__global__ void normalize_kernel(double* x, int size, double* x_sum) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx < size) {
-        x[idx] /= *x_sum;
+    double sum = 0.0;
+    for (int i = 0; i < size; i++) {
+        x[i] = exp(x[i] - max_val);
+        sum += x[i];
+    }
+
+    for (int i = 0; i < size; i++) {
+        x[i] /= sum;
     }
 }
 
@@ -58,29 +63,12 @@ double* softmax_cuda(double* x, int size) {
     cudaMalloc(&d_x, size * sizeof(double));
     cudaMemcpy(d_x, x, size * sizeof(double), cudaMemcpyHostToDevice);
 
-    double max_val = x[0];
-    for (int i = 1; i < size; i++) {
-        if (x[i] > max_val) {
-            max_val = x[i];
-        }
-    }
-
     int blockSize = 256;
     int numBlocks = (size + blockSize - 1) / blockSize;
-    softmax_kernel<<<numBlocks, blockSize>>>(d_x, size, max_val);
-
-    double* d_x_sum;
-    cudaMalloc(&d_x_sum, sizeof(double));
-    cudaMemcpy(d_x_sum, &x[0], sizeof(double), cudaMemcpyHostToDevice);
-    for (int i = 1; i < size; i++) {
-        atomicAdd(d_x_sum, x[i]);
-    }
-
-    normalize_kernel<<<numBlocks, blockSize>>>(d_x, size, d_x_sum);
+    softmax_kernel<<<numBlocks, blockSize>>>(d_x, size);
 
     cudaMemcpy(x, d_x, size * sizeof(double), cudaMemcpyDeviceToHost);
     cudaFree(d_x);
-    cudaFree(d_x_sum);
     return x;
 }
 
