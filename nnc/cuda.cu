@@ -15,60 +15,33 @@ void printProgressBar(double progress);
 
 
 
-__global__ void relu_kernel(double* x, int size) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx < size) {
-        if (x[idx] < 0) {
-            x[idx] = 0;
+double* relu(double* x, int size) {
+    for (int i = 0; i < size; i++) {
+        if (x[i] < 0) {
+            x[i] = 0;
         }
     }
-}
-
-double* relu_cuda(double* x, int size) {
-    double* d_x;
-    cudaMalloc(&d_x, size * sizeof(double));
-    cudaMemcpy(d_x, x, size * sizeof(double), cudaMemcpyHostToDevice);
-
-    int blockSize = 256;
-    int numBlocks = (size + blockSize - 1) / blockSize;
-    relu_kernel<<<numBlocks, blockSize>>>(d_x, size);
-
-    cudaMemcpy(x, d_x, size * sizeof(double), cudaMemcpyDeviceToHost);
-    cudaFree(d_x);
     return x;
 }
 
-// softmax cuda
-__global__ void softmax_kernel(double* x, int size) {
-    double max_val = x[0];
+double* softmax(double* x, int size) {
+    double max = x[0];
+    double x_sum = 0;
     for (int i = 1; i < size; i++) {
-        if (x[i] > max_val) {
-            max_val = x[i];
+        if (x[i] > max) {
+            max = x[i];
         }
     }
-
-    double sum = 0.0;
     for (int i = 0; i < size; i++) {
-        x[i] = exp(x[i] - max_val);
-        sum += x[i];
+        x[i] = exp(x[i] - max);
     }
-
+    // synchronize
     for (int i = 0; i < size; i++) {
-        x[i] /= sum;
+        x_sum += x[i];
     }
-}
-
-double* softmax_cuda(double* x, int size) {
-    double* d_x;
-    cudaMalloc(&d_x, size * sizeof(double));
-    cudaMemcpy(d_x, x, size * sizeof(double), cudaMemcpyHostToDevice);
-
-    int blockSize = 256;
-    int numBlocks = (size + blockSize - 1) / blockSize;
-    softmax_kernel<<<numBlocks, blockSize>>>(d_x, size);
-
-    cudaMemcpy(x, d_x, size * sizeof(double), cudaMemcpyDeviceToHost);
-    cudaFree(d_x);
+    for (int i = 0; i < size; i++) {
+        x[i] = x[i] / x_sum;
+    }
     return x;
 }
 
@@ -228,9 +201,9 @@ double* custom_MLP_2l_inf(double* input_data, int size_input, int size_l2, int s
     double* n2 = (double*)malloc(size_output * sizeof(double));
 
     n1 = layer_inf_cuda(l1p, l1b, size_l2, input_data, size_input);
-    n1 = relu_cuda(n1, size_l2);
+    n1 = relu(n1, size_l2);
     n2 = layer_inf_cuda(l2p, l2b, size_output, n1, size_l2);
-    n2 = softmax_cuda(n2, size_output);
+    n2 = softmax(n2, size_output);
 
     free(n1);
     return n2;
@@ -290,94 +263,149 @@ double evaluate_accuracy(double* l1p, double* l1b, double* l2p, double* l2b, int
     return correct_predictions / MNIST_NUM_IMAGES_TEST;
 }
 
-void train_model(double* l1p, double* l1b, double* l2p, double* l2b, int size_input, int size_l2, int size_output, double learning_rate, int epochs) {
-    uint8_t** train_images = (uint8_t**)malloc(MNIST_NUM_IMAGES * sizeof(uint8_t*));
-    for (int i = 0; i < MNIST_NUM_IMAGES; i++) {
-        train_images[i] = (uint8_t*)malloc(MNIST_IMAGE_SIZE * sizeof(uint8_t));
-    }
-    uint8_t** one_hot_labels = (uint8_t**)malloc(MNIST_NUM_IMAGES * sizeof(uint8_t*));
-    for (int i = 0; i < MNIST_NUM_IMAGES; i++) {
-        one_hot_labels[i] = (uint8_t*)malloc(MNIST_NUM_LABELS * sizeof(uint8_t));
-    }
-    uint8_t* labels = (uint8_t*)malloc(MNIST_NUM_IMAGES * sizeof(uint8_t));
+// void train_model(double* l1p, double* l1b, double* l2p, double* l2b, int size_input, int size_l2, int size_output, double learning_rate, int epochs) {
+//     uint8_t** train_images = (uint8_t**)malloc(MNIST_NUM_IMAGES * sizeof(uint8_t*));
+//     for (int i = 0; i < MNIST_NUM_IMAGES; i++) {
+//         train_images[i] = (uint8_t*)malloc(MNIST_IMAGE_SIZE * sizeof(uint8_t));
+//     }
+//     uint8_t** one_hot_labels = (uint8_t**)malloc(MNIST_NUM_IMAGES * sizeof(uint8_t*));
+//     for (int i = 0; i < MNIST_NUM_IMAGES; i++) {
+//         one_hot_labels[i] = (uint8_t*)malloc(MNIST_NUM_LABELS * sizeof(uint8_t));
+//     }
+//     uint8_t* labels = (uint8_t*)malloc(MNIST_NUM_IMAGES * sizeof(uint8_t));
 
-    printf("Loading training images...\n");
-    read_mnist_images("train-images.idx3-ubyte", train_images, MNIST_NUM_IMAGES);
-    printf("Loading training labels...\n");
-    read_mnist_labels("train-labels.idx1-ubyte", labels, one_hot_labels, MNIST_NUM_IMAGES);
+//     printf("Loading training images...\n");
+//     read_mnist_images("train-images.idx3-ubyte", train_images, MNIST_NUM_IMAGES);
+//     printf("Loading training labels...\n");
+//     read_mnist_labels("train-labels.idx1-ubyte", labels, one_hot_labels, MNIST_NUM_IMAGES);
 
-    for (int epoch = 0; epoch < epochs; epoch++) {
-        double total_loss = 0.0;
+//     for (int epoch = 0; epoch < epochs; epoch++) {
+//         double total_loss = 0.0;
 
-        printf("Epoch %d: ", epoch + 1);
-        printProgressBar((double)(epoch + 1) / epochs);
-        printf("\n");
+//         printf("Epoch %d: ", epoch + 1);
+//         printProgressBar((double)(epoch + 1) / epochs);
+//         printf("\n");
 
 
-        for (int i = 0; i < MNIST_NUM_IMAGES; i++) {
+//         for (int i = 0; i < MNIST_NUM_IMAGES; i++) {
   
-            // Forward pass
-            double* input_data = (double*)malloc(MNIST_IMAGE_SIZE * sizeof(double));
-            double* output;
+//             // Forward pass
+//             double* input_data = (double*)malloc(MNIST_IMAGE_SIZE * sizeof(double));
+//             double* output;
 
-            for (int j = 0; j < MNIST_IMAGE_SIZE; j++) {
-                input_data[j] = (double)(train_images[i][j]) / 255.0;
-            }
-            output = custom_MLP_2l_inf(input_data, MNIST_IMAGE_SIZE, size_l2, size_output, l1p, l1b, l2p, l2b);
+//             for (int j = 0; j < MNIST_IMAGE_SIZE; j++) {
+//                 input_data[j] = (double)(train_images[i][j]) / 255.0;
+//             }
+//             output = custom_MLP_2l_inf(input_data, MNIST_IMAGE_SIZE, size_l2, size_output, l1p, l1b, l2p, l2b);
 
-            // Calculate loss
-            double* target = (double*)malloc(size_output * sizeof(double));
-            for (int j = 0; j < MNIST_NUM_LABELS; j++) {
-                target[j] = one_hot_labels[i][j];
-            }
-            double loss = categorical_cross_entropy_loss(output, target, size_output);
-            total_loss += loss;
+//             // Calculate loss
+//             double* target = (double*)malloc(size_output * sizeof(double));
+//             for (int j = 0; j < MNIST_NUM_LABELS; j++) {
+//                 target[j] = one_hot_labels[i][j];
+//             }
+//             double loss = categorical_cross_entropy_loss(output, target, size_output);
+//             total_loss += loss;
 
-            // Backpropagation
-            // Update layer 2 weights and biases
-            double* l2_deltas = (double*)malloc(size_output * sizeof(double));
-            for (int j = 0; j < size_output; j++) {
-                l2_deltas[j] = output[j] - target[j];
-            }
-            for (int j = 0; j < size_output; j++) {
-                for (int k = 0; k < size_l2; k++) {
-                    l2p[j * size_l2 + k] -= learning_rate * l2_deltas[j] * relu_derivative(l2p[j * size_l2 + k]);
-                }
-                l2b[j] -= learning_rate * l2_deltas[j];
-            }
-            free(l2_deltas);
-            free(target);
+//             // Backpropagation
+//             // Update layer 2 weights and biases
+//             double* l2_deltas = (double*)malloc(size_output * sizeof(double));
+//             for (int j = 0; j < size_output; j++) {
+//                 l2_deltas[j] = output[j] - target[j];
+//             }
+//             for (int j = 0; j < size_output; j++) {
+//                 for (int k = 0; k < size_l2; k++) {
+//                     l2p[j * size_l2 + k] -= learning_rate * l2_deltas[j] * relu_derivative(l2p[j * size_l2 + k]);
+//                 }
+//                 l2b[j] -= learning_rate * l2_deltas[j];
+//             }
+//             free(l2_deltas);
+//             free(target);
 
-            // Update layer 1 weights and biases
-            double* l1_deltas = (double*)malloc(size_l2 * sizeof(double));
-            for (int j = 0; j < size_l2; j++) {
-                double error = 0.0;
-                for (int k = 0; k < size_output; k++) {
-                    error += l2p[k * size_l2 + j] * l2_deltas[k];
-                }
-                l1_deltas[j] = error * relu_derivative(l1b[j]);
-            }
-            for (int j = 0; j < size_l2; j++) {
-                for (int k = 0; k < size_input; k++) {
-                    l1p[j * size_input + k] -= learning_rate * l1_deltas[j] * input_data[k];
-                }
-                l1b[j] -= learning_rate * l1_deltas[j];
-            }
-            free(l1_deltas);
-            free(input_data);
-            free(output);
+//             // Update layer 1 weights and biases
+//             double* l1_deltas = (double*)malloc(size_l2 * sizeof(double));
+//             for (int j = 0; j < size_l2; j++) {
+//                 double error = 0.0;
+//                 for (int k = 0; k < size_output; k++) {
+//                     error += l2p[k * size_l2 + j] * l2_deltas[k];
+//                 }
+//                 l1_deltas[j] = error * relu_derivative(l1b[j]);
+//             }
+//             for (int j = 0; j < size_l2; j++) {
+//                 for (int k = 0; k < size_input; k++) {
+//                     l1p[j * size_input + k] -= learning_rate * l1_deltas[j] * input_data[k];
+//                 }
+//                 l1b[j] -= learning_rate * l1_deltas[j];
+//             }
+//             free(l1_deltas);
+//             free(input_data);
+//             free(output);
+//         }
+//         printf("Epoch %d - Loss: %f\n", epoch+1, total_loss / MNIST_NUM_IMAGES);
+//     }
+
+//     // Free allocated memory
+//     for (int i = 0; i < MNIST_NUM_IMAGES; i++) {
+//         free(train_images[i]);
+//         free(one_hot_labels[i]);
+//     }
+//     free(train_images);
+//     free(one_hot_labels);
+//     free(labels);
+// }
+
+__global__ void trainKernel(double* l1p, double* l1b, double* l2p, double* l2b, int size_input, int size_l2, int size_output, double learning_rate, int epochs, uint8_t** train_images, uint8_t** one_hot_labels) {
+    int batch = blockDim.x * blockIdx.x + threadIdx.x;
+    if (batch < MNIST_NUM_IMAGES) {
+        // Forward pass
+        double* input_data = (double*)malloc(MNIST_IMAGE_SIZE * sizeof(double));
+        double* output;
+
+        for (int j = 0; j < MNIST_IMAGE_SIZE; j++) {
+            input_data[j] = (double)(train_images[batch][j]) / 255.0;
         }
-        printf("Epoch %d - Loss: %f\n", epoch+1, total_loss / MNIST_NUM_IMAGES);
-    }
+        output = custom_MLP_2l_inf(input_data, MNIST_IMAGE_SIZE, size_l2, size_output, l1p, l1b, l2p, l2b);
 
-    // Free allocated memory
-    for (int i = 0; i < MNIST_NUM_IMAGES; i++) {
-        free(train_images[i]);
-        free(one_hot_labels[i]);
+        // Calculate loss
+        double* target = (double*)malloc(size_output * sizeof(double));
+        for (int j = 0; j < MNIST_NUM_LABELS; j++) {
+            target[j] = one_hot_labels[batch][j];
+        }
+        double loss = categorical_cross_entropy_loss(output, target, size_output);
+
+        // Backpropagation
+        // Update layer 2 weights and biases
+        double* l2_deltas = (double*)malloc(size_output * sizeof(double));
+        for (int j = 0; j < size_output; j++) {
+            l2_deltas[j] = output[j] - target[j];
+        }
+        for (int j = 0; j < size_output; j++) {
+            for (int k = 0; k < size_l2; k++) {
+                l2p[j * size_l2 + k] -= learning_rate * l2_deltas[j] * relu_derivative(l2p[j * size_l2 + k]);
+            }
+            l2b[j] -= learning_rate * l2_deltas[j];
+        }
+        free(l2_deltas);
+
+        // Update layer 1 weights and biases
+        double* l1_deltas = (double*)malloc(size_l2 * sizeof(double));
+        for (int j = 0; j < size_l2; j++) {
+            double error = 0.0;
+            for (int k = 0; k < size_output; k++) {
+                error += l2p[k * size_l2 + j] * l2_deltas[k];
+            }
+            l1_deltas[j] = error * relu_derivative(l1b[j]);
+        }
+        for (int j = 0; j < size_l2; j++) {
+            for (int k = 0; k < size_input; k++) {
+                l1p[j * size_input + k] -= learning_rate * l1_deltas[j] * input_data[k];
+            }
+            l1b[j] -= learning_rate * l1_deltas[j];
+        }
+        free(l1_deltas);
+
+        free(input_data);
+        free(output);
     }
-    free(train_images);
-    free(one_hot_labels);
-    free(labels);
 }
 
 
@@ -403,8 +431,8 @@ void printProgressBar(double progress) {
 }
 
 int main() {
-    srand(66);  
-    
+    srand(66);
+
     // Load training data
     uint8_t** images = (uint8_t**)malloc(MNIST_NUM_IMAGES_TEST * sizeof(uint8_t*));
     for (int i = 0; i < MNIST_NUM_IMAGES_TEST; i++) {
