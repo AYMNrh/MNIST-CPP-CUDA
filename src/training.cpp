@@ -20,7 +20,7 @@ ConvolutionalLayer convolutional_back_Propagation(ConvolutionalLayer convolution
                         int input_i = i * stride + u;
                         int input_j = j * stride + v;
                         if (input_i >= 0 && input_i < input_height && input_j >= 0 && input_j < input_width) {
-                            filter_gradients[k][u][v] += train_image[i][j] * conv_output[k][u][v];
+                            filter_gradients[k][u][v] -= train_image[i][j] * conv_output[k][u][v];
                         }
                     }
                 }
@@ -57,7 +57,7 @@ DenseLayer dense_back_Propagation(DenseLayer dense_layer, uint8_t* training_labe
     for (int i = 0; i < dense_layer.num_neurons; i++) {
         Neuron& neuron = dense_layer.neurons[i];
         for (int j = 0; j < neuron.num_inputs; j++) {
-            neuron.weights[j] -= learning_rate * training_label[i] * dense_layer.derivative[i] * neuron.inputs[j];
+            neuron.weights[j] += learning_rate * training_label[i] * dense_layer.derivative[i] * neuron.inputs[j];
         }
     }
     return dense_layer;

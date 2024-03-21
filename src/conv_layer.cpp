@@ -11,7 +11,7 @@ ConvolutionalLayer::ConvolutionalLayer(int num_filters, int filter_size, int str
 
 // Function to randomize filter weights
 void ConvolutionalLayer::randomize_filters() {
-    srand(time(0)); // Seed the random number generator
+    srand(66); // Seed the random number generator
     // Loop through each filter
     for (int k = 0; k < num_filters; ++k) {
         // Loop through each row of the filter

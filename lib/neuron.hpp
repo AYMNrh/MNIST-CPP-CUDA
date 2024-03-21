@@ -11,15 +11,12 @@ using namespace std;
 
 class Neuron {
     public:
-        vector<double> weights;    // Weights of the neuron
         int num_inputs;                  // Number of inputs to the neuron
+        vector<double> weights;    // Weights of the neuron
         vector<double> inputs;     // Inputs to the neuron
 
     public:
-        Neuron();                        // Default constructor
-        Neuron(int num_inputs);          // Constructor with number of inputs specified
-
-    private:
+        Neuron(int num_inputs);          // Constructor with number of inputs specified:
         void randomize_weights();        // Function to randomize weights
 
     public:

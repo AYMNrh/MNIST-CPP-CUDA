@@ -4,6 +4,10 @@
 DenseLayer::DenseLayer(int num_inputs, int num_neurons) : num_neurons(num_neurons) {
     // Resize the neurons vector and initialize neurons with specified number of inputs
     neurons.resize(num_neurons, Neuron(num_inputs));
+    for(int i = 0; i<num_neurons; i++){
+        neurons[i].randomize_weights();
+    }
+
 }
 
 // Softmax function
@@ -28,7 +32,11 @@ vector<double> DenseLayer::softmax(vector<double>& inputs) {
 vector<double> DenseLayer::calculate_derivative(vector<double>& outputs) {
     vector<double> derivative(outputs.size());
     for (int i = 0; i < outputs.size(); ++i) {
-        derivative[i] = outputs[i] * (1 - outputs[i]);   // Compute the derivative of the output
+        //derivative[i] = outputs[i] * (1 - outputs[i]);   // Compute the derivative of the output
+        if(outputs[i]>0){
+            derivative[i] = 1;
+        }
+        derivative[i] = 0;
     }
     return derivative;
 }

@@ -11,9 +11,31 @@
 using namespace std;
 
 #define MNIST_IMAGE_SIZE 28 * 28
-#define MNIST_NUM_IMAGES 60000
-#define MNIST_NUM_LABELS 10
-#define MNIST_NUM_IMAGES_TEST 10000
+#define MNIST_NUM_IMAGES 1000
+#define MNIST_NUM_LABELS 100
+#define MNIST_NUM_IMAGES_TEST 10
+
+void writeLabelsToFile(const uint8_t* labels, int num_labels, const string& filename) {
+    ofstream file(filename);
+    if (!file.is_open()) {
+        cerr << "Error opening file: " << filename << endl;
+        return;
+    }
+
+    // Write the labels to the file
+    for (int i = 0; i < num_labels; ++i) {
+        file << static_cast<int>(labels[i]) << "\n"; // Convert uint8_t to int and write to file
+    }
+
+    file.close();
+}
+
+void printVector(const vector<double>& vec) {
+    for (const auto& elem : vec) {
+        cout << elem << " ";
+    }
+    cout << endl;
+}
 
 void read_mnist_images(const char* image_file_path, uint8_t** images, int num_images) {
     FILE* file = fopen(image_file_path, "rb");
@@ -56,7 +78,6 @@ void read_mnist_labels(const char* label_file_path, uint8_t* labels, uint8_t** o
             one_hot_labels[i][j] = (j == label) ? 1 : 0;
         }
     }
-
     fclose(file);
 }
 
@@ -106,7 +127,6 @@ vector<vector<vector<double>>> convert_images(uint8_t** images, int num_images) 
 }
 
 int main() {
-
     // Initialize convolutional layer
     ConvolutionalLayer conv_layer(32, 3, 1);
 
@@ -131,9 +151,12 @@ int main() {
 
     uint8_t* train_labels = (uint8_t*)malloc(MNIST_NUM_IMAGES * sizeof(uint8_t));
 
+
     printf("Loading training data...\n");
     read_mnist_images("../data/train-images.idx3-ubyte", train_images, MNIST_NUM_IMAGES);
-    read_mnist_labels("../data/train-labels.idx1-ubyte", train_labels, train_one_hot_labels, MNIST_NUM_LABELS);
+    read_mnist_labels("../data/train-labels.idx1-ubyte", train_labels, train_one_hot_labels, MNIST_NUM_IMAGES);
+    // Write labels to file
+    writeLabelsToFile(train_labels, MNIST_NUM_IMAGES, "labels.txt");
     printf("Loading done \n");
 
     // Load testing data
@@ -151,33 +174,35 @@ int main() {
 
     printf("Loading testing data...\n");
     read_mnist_images("../data/t10k-images.idx3-ubyte", test_images, MNIST_NUM_IMAGES_TEST);
-    read_mnist_labels("../data/t10k-labels.idx1-ubyte", test_labels, test_one_hot_labels, MNIST_NUM_LABELS);
+    read_mnist_labels("../data/t10k-labels.idx1-ubyte", test_labels, test_one_hot_labels, MNIST_NUM_IMAGES_TEST);
     printf("Loading done \n");
 
     // Transform images
     vector<vector<vector<double>>> training_images = convert_images(train_images, MNIST_NUM_IMAGES);
     vector<vector<vector<double>>> testing_images = convert_images(test_images, MNIST_NUM_IMAGES_TEST);
 
-    // Loop over training labels
+    // Loop over training labprintf("output class : %d", output_class);els
     printf("Start Training \n");
     for (int i = 0; i < MNIST_NUM_IMAGES; i++) {
         vector<vector<vector<double>>> convolution_output = conv_layer.apply_convolution(training_images[i]);
         vector<vector<vector<double>>> pooling_output = max_pooling(convolution_output, 2);
         vector<double> flattened_output = flatten(pooling_output);
+        
         vector<double> output = dense_layer.compute_output(flattened_output);
 
         // Train CNN
-        conv_layer = convolutional_back_Propagation(conv_layer, training_images[i], convolution_output, 0.1);
-        vector<vector<vector<double>>> trained_convolution_output = conv_layer.apply_convolution(training_images[i]);
-        vector<vector<vector<double>>> trained_pooling_output = max_pooling(trained_convolution_output, 2);
-        vector<double> trained_flattened_output = flatten(trained_pooling_output);
-        dense_layer = dense_back_Propagation(dense_layer, train_one_hot_labels[i], 0.1);
-        vector<double> trained_output = dense_layer.compute_output(trained_flattened_output);
-        int output_class = detect_class(trained_output);
+        //conv_layer = convolutional_back_Propagation(conv_layer, training_images[i], convolution_output, 0.1);
+        //convolution_output = conv_layer.apply_convolution(training_images[i]);
+        //pooling_output = max_pooling(convolution_output, 2);
+        //flattened_output = flatten(pooling_output);
+        //dense_layer = dense_back_Propagation(dense_layer, train_one_hot_labels[i], 0.1);
+        //output = dense_layer.compute_output(flattened_output);
+        int output_class = detect_class(output);
 
         if (output_class == train_labels[i]) {
             accuracy += 1;
         }
+        printf("output class : %d\n", output_class);
     }
 
     // Free allocated memory
@@ -195,7 +220,7 @@ int main() {
     double training_accuracy = accuracy / MNIST_NUM_IMAGES;
 
     // Display accuracy
-    cout << "Training Accuracy : " << training_accuracy << endl << endl;
+    printf("Training Accuracy : %f \n", training_accuracy);
 
     for(int i=0; i<MNIST_NUM_IMAGES_TEST; i++) {
         vector<vector<vector<double>>> test_convolution_output = conv_layer.apply_convolution(testing_images[i]);
@@ -209,6 +234,7 @@ int main() {
         }
     }
 
+
     // Free allocated memory
     for (int i = 0; i < MNIST_NUM_IMAGES_TEST; i++) {
         free(test_images[i]);
@@ -219,7 +245,9 @@ int main() {
     free(test_one_hot_labels);
     free(test_labels);
 
+    precision /= MNIST_NUM_IMAGES_TEST;
+
     // Display precision
-    cout << "Testing precision : " << precision << endl;
+    printf("Testing precision : %f\n", precision);
 
 };

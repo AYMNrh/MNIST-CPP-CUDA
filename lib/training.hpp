@@ -14,7 +14,7 @@ using namespace std;
 ConvolutionalLayer convolutional_back_Propagation(ConvolutionalLayer convolutional_layer, const vector<vector<double>> train_images, vector<vector<vector<double>>> conv_output, double learning_rate);
 
 // Function to calculate crossentropy error
-double crossentropy_error(const vector<int> training_label, const vector<double> predict_output);
+double crossentropy_error(uint8_t* training_label, const vector<double> predict_output);
 
 // Function to perform backpropagation for dense layer
 DenseLayer dense_back_Propagation(DenseLayer dense_layer, uint8_t* training_label, double learning_rate);
