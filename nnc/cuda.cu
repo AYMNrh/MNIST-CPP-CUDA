@@ -13,33 +13,71 @@ double relu_derivative(double x);
 // Function declarations
 void printProgressBar(double progress);
 
-double* relu(double* x, int size) {
-    for (int i = 0; i < size; i++) {
+
+
+__global__ reluKernel(double* x, int size) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i < size) {
         if (x[i] < 0) {
             x[i] = 0;
         }
     }
+}
+
+double* relu_cuda(double* x, int size) {
+    double* d_x;
+    cudaMalloc(&d_x, size * sizeof(double));
+    cudaMemcpy(d_x, x, size * sizeof(double), cudaMemcpyHostToDevice);
+
+    int blockSize = 256;
+    int gridSize = (size + blockSize - 1) / blockSize;
+    reluKernel <<<gridSize, blockSize >>> (d_x, size);
+
+    cudaMemcpy(x, d_x, size * sizeof(double), cudaMemcpyDeviceToHost);
+    cudaFree(d_x);
+
     return x;
 }
 
-double* softmax(double* x, int size) {
-    double max = x[0];
-    double x_sum = 0;
-    for (int i = 1; i < size; i++) {
-        if (x[i] > max) {
-            max = x[i];
+
+// softmax cuda
+__global__ void softmaxKernel(double* x, int size) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i < size) {
+        double max = x[0];
+        double x_sum = 0;
+        for (int j = 1; j < size; j++) {
+            if (x[j] > max) {
+                max = x[j];
+            }
+        }
+        for (int j = 0; j < size; j++) {
+            x[j] = exp(x[j] - max);
+        }
+        // synchronize
+        for (int j = 0; j < size; j++) {
+            x_sum += x[j];
+        }
+        for (int j = 0; j < size; j++) {
+            x[j] = x[j] / x_sum;
         }
     }
-    for (int i = 0; i < size; i++) {
-        x[i] = exp(x[i] - max);
-    }
-    // synchronize
-    for (int i = 0; i < size; i++) {
-        x_sum += x[i];
-    }
-    for (int i = 0; i < size; i++) {
-        x[i] = x[i] / x_sum;
-    }
+}
+
+double* softmax_cuda(double* x, int size) {
+    double* d_x;
+    cudaMalloc(&d_x, size * sizeof(double));
+    cudaMemcpy(d_x, x, size * sizeof(double), cudaMemcpyHostToDevice);
+
+    int blockSize = 256;
+    int gridSize = (size + blockSize - 1) / blockSize;
+    softmaxKernel <<<gridSize, blockSize >>> (d_x, size);
+
+    cudaMemcpy(x, d_x, size * sizeof(double), cudaMemcpyDeviceToHost);
+    cudaFree(d_x);
+
     return x;
 }
 
@@ -104,18 +142,7 @@ double* layer_inf_cuda(double* l_p, double* l_b, int num_outputs, double* neuron
     return output;
 }
 
-double* layer_inf(double* l_p, double* l_b, int num_outputs, double* neurons, int num_inputs) {
-    double* output = (double*)malloc(num_outputs * sizeof(double));
 
-    for (int j = 0; j < num_outputs; j++) {
-        output[j] = l_b[j];
-        for (int i = 0; i < num_inputs; i++) {
-            output[j] += neurons[i] * l_p[j * num_inputs + i];
-        }
-    }
-
-    return output;
-}
 
 
 
@@ -176,9 +203,9 @@ double* custom_MLP_2l_inf(double* input_data, int size_input, int size_l2, int s
     double* n2 = (double*)malloc(size_output * sizeof(double));
 
     n1 = layer_inf_cuda(l1p, l1b, size_l2, input_data, size_input);
-    n1 = relu(n1, size_l2);
+    n1 = relu_cuda(n1, size_l2);
     n2 = layer_inf_cuda(l2p, l2b, size_output, n1, size_l2);
-    n2 = softmax(n2, size_output);
+    n2 = softmax_cuda(n2, size_output);
 
     free(n1);
     return n2;
